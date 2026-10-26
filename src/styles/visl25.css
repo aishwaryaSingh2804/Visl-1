@@ -177,8 +177,13 @@
 .v25-svg-41 { top: 1830px; right: 28%; color: rgba(124, 58, 237, 0.22); }
 .v25-svg-42 { top: 1960px; left: 17%; color: rgba(36, 90, 196, 0.22); }
 
-/* Scroll-driven ribbon: a playful, gradient trail that reveals as the page moves */
-.visl25-guiding-line-canvas {
+/* ──────────────────────────────────────────────────────────────────────────
+   FILM STRIP GUIDE
+   A realistic strip of 35mm film runs down the side gutters and crosses the page only inside the
+   blank "film break" bands, so it never sits behind text. Geometry is built by JS from measured
+   pixel positions. Stacking: ambience (0) < strip (0) < camera (1) < content container (2).
+   ────────────────────────────────────────────────────────────────────────── */
+.v25-reel-canvas {
   position: absolute;
   inset: 0 auto auto 0;
   width: 100%;
@@ -187,14 +192,67 @@
   z-index: 0;
   overflow: visible;
 }
-.visl25-guiding-line-glow {
-  opacity: 0.07;
-  filter: blur(7px);
+.v25-reel-canvas path {
+  fill: none;
+  stroke-linejoin: round;
 }
-.visl25-guiding-line {
-  filter: drop-shadow(0 0 5px rgba(67, 135, 255, 0.28));
+.v25-reel-ghost {
+  stroke: rgba(36, 90, 196, 0.26);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 2 9;
 }
-50% { transform: scale(1.2); opacity: 1; }
+.v25-reel-shadow {
+  stroke: rgba(14, 28, 52, 0.16);
+  stroke-linecap: butt;
+}
+.v25-reel-body {
+  stroke: #10151c; /* dark acetate base */
+  stroke-linecap: butt;
+}
+.v25-reel-edge {
+  stroke: rgba(255, 255, 255, 0.2); /* polished film edge */
+  stroke-linecap: butt;
+}
+.v25-reel-frames {
+  stroke: url(#v25-reel-grad); /* exposed frame cells */
+  stroke-linecap: butt;
+  opacity: 0.92;
+}
+.v25-reel-shine {
+  stroke: rgba(255, 255, 255, 0.2); /* faint highlight inside each frame */
+  stroke-linecap: butt;
+}
+.v25-reel-perf {
+  stroke: var(--v25-perf, #eef3fb); /* perforations (round caps = rounded rectangles) */
+  stroke-linecap: round;
+}
+
+.v25-reel-cam-layer {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1; /* below the content container (z-index: 2): can never cover text */
+  overflow: visible;
+}
+.v25-cam {
+  opacity: 0; /* revealed by JS once positioned */
+  transition: opacity 0.5s ease;
+}
+.v25-cam-led {
+  animation: v25-rec-blink 1.4s steps(2, jump-none) infinite;
+}
+@keyframes v25-rec-blink {
+  0% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+
+/* Blank band between sections. The strip crosses the page here, so nothing else may sit in it. */
+.v25-film-gap {
+  height: clamp(150px, 14vw, 200px);
+  pointer-events: none;
 }
 
 .visl25-container {
@@ -233,7 +291,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 .visl25-header {
   position: relative;
-  padding: 64px 0 56px;
+  padding: 64px 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -333,7 +391,7 @@
 /* Hero Apply CTA Button */
 .visl25-hero-btn-wrap {
   margin-top: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .visl25-apply-btn {
@@ -385,7 +443,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 .visl25-benefits-section {
   position: relative;
-  padding: 48px 0 20px;
+  padding: 8px 0 0;
 }
 
 .visl25-benefits-header {
@@ -426,16 +484,94 @@
   grid-template-columns: minmax(205px, max-content) minmax(0, 1fr);
   align-items: center;
   gap: 32px;
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  /* Transform is driven by GSAP (tilt + lift), so it must NOT be transitioned in CSS. */
+  transition: box-shadow 0.22s ease, border-color 0.22s ease;
   will-change: transform;
+  --mx: 50%;
+  --my: 50%;
 }
 
 .visl25-card:hover {
-  transform: translateY(-3px);
   border-color: rgba(36, 90, 196, 0.32);
   box-shadow:
     0 18px 40px -6px rgba(36, 90, 196, 0.14),
     0 4px 12px rgba(18, 42, 74, 0.06);
+}
+
+/* Cursor spotlight: position is fed by --mx / --my from the pointer handler */
+.visl25-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    380px circle at var(--mx) var(--my),
+    rgba(67, 135, 255, 0.16),
+    rgba(67, 135, 255, 0.05) 45%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .visl25-card:hover::before {
+    opacity: 1;
+  }
+}
+
+.visl25-card > .visl25-card-stat-col,
+.visl25-card > .visl25-card-body-col {
+  position: relative;
+  z-index: 1;
+}
+
+/* Signature art (top-right). Rest state is the fully drawn icon, so touch and
+   reduced-motion users still see it; GSAP only replays it on hover. */
+.visl25-card-art {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  color: #245ac4;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.visl25-card-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.visl25-pie-slice {
+  stroke-dasharray: 9.42 62.83; /* 15% of the r=10 circle; matches DrawSVG end state */
+}
+
+/* Pooled coins: all 14 live in the DOM, GSAP just moves them */
+.visl25-card-fx {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.visl25-coin,
+.visl25-fx-p {
+  color: #245ac4; /* seats use currentColor */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
 /* Left Stat Column */
@@ -482,6 +618,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding-right: 64px; /* keeps text clear of the signature art */
 }
 
 .visl25-card-num-badge {
@@ -551,7 +688,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 .visl25-cta-section {
   position: relative;
-  padding: 44px 0 20px;
+  padding: 0 0 20px;
 }
 
 .visl25-cta-box {
@@ -608,15 +745,26 @@
     border-bottom: 1px solid rgba(36, 90, 196, 0.1);
     padding-right: 0;
     padding-bottom: 12px;
+    padding-right: 52px; /* room for the art */
     flex-direction: row;
     align-items: baseline;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .visl25-card-body-col {
+    padding-right: 0;
+  }
+  .visl25-card-art {
+    top: 14px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
   }
 }
 
 @media (max-width: 720px) {
   .visl25-header {
-    padding: 44px 0 36px;
+    padding: 44px 0 0;
   }
   .visl25-footer-tag {
     border-radius: 16px;
@@ -628,26 +776,362 @@
 }
 
 
-/* Founding-seat CTA: letter choreography with SVGs anchored to the card */
-.v25-seat-cta {
+
+/* ==========================================================================
+   GOLDEN TICKET CTA
+   Two stacked halves (main + stub) with half-circle notches where they meet, so the join reads as a
+   perforated ticket. The drop-shadow lives on the wrapper because a mask would clip a box-shadow.
+   Stacking inside the scratch zone: headline (1) < flash (2) < foil canvas (3) < shimmer (4) < flakes/hint (5).
+   ========================================================================== */
+.visl25-cta-section {
+  position: relative;
+}
+/* Soft breathing glow behind the ticket (opacity only, so it is cheap to animate) */
+.visl25-cta-section::before {
+  content: '';
+  position: absolute;
+  inset: -12% 0;
+  background: radial-gradient(ellipse at center, rgba(255, 205, 70, 0.42), transparent 66%);
+  pointer-events: none;
+  z-index: 0;
+  animation: v25-ticket-breathe 3.6s ease-in-out infinite;
+}
+@keyframes v25-ticket-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.v25-ticket-wrap {
+  --tk-notch: 14px;
+  --tk-ink: #6b4300;
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+  margin: 0 auto;
+  filter: drop-shadow(0 22px 26px rgba(150, 95, 0, 0.28)) drop-shadow(0 4px 8px rgba(18, 42, 74, 0.12));
+}
+
+.v25-ticket-main,
+.v25-ticket-stub {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(67, 135, 255, .12), transparent 55%),
-    #fff;
+    radial-gradient(120% 90% at 15% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
+    linear-gradient(135deg, #ffe58f 0%, #f7cf55 28%, #eab032 52%, #fadb7a 76%, #e4a21d 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    inset 0 0 0 6px rgba(160, 100, 0, 0.22);
 }
-.v25-seat-cta > *:not(.v25-cta-orbit-art) {
-  position: relative;
+
+.v25-ticket-main {
+  padding: clamp(18px, 3.4vw, 28px) clamp(16px, 4vw, 36px) 8px;
+  border-radius: 24px 24px 0 0;
+  -webkit-mask:
+    radial-gradient(circle var(--tk-notch) at 0 100%, transparent 96%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--tk-notch) at 100% 100%, transparent 96%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle var(--tk-notch) at 0 100%, transparent 96%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--tk-notch) at 100% 100%, transparent 96%, #000) right / 51% 100% no-repeat;
+}
+
+.v25-ticket-stub {
+  margin-top: -1px; /* hides the hairline between the halves */
+  padding: clamp(24px, 4vw, 32px) clamp(16px, 4vw, 40px) clamp(20px, 3vw, 26px);
+  border-radius: 0 0 24px 24px;
+  text-align: center;
+  -webkit-mask:
+    radial-gradient(circle var(--tk-notch) at 0 0, transparent 96%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--tk-notch) at 100% 0, transparent 96%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle var(--tk-notch) at 0 0, transparent 96%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--tk-notch) at 100% 0, transparent 96%, #000) right / 51% 100% no-repeat;
+}
+/* Perforation line between the notches */
+.v25-ticket-stub::before {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: calc(var(--tk-notch) + 10px);
+  right: calc(var(--tk-notch) + 10px);
+  border-top: 2.5px dashed rgba(107, 67, 0, 0.45);
+  pointer-events: none;
+}
+
+.v25-ticket-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--tk-ink);
+}
+
+/* Twinkling stars on the gold */
+.v25-tk-star {
+  position: absolute;
+  bottom: 20px;
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  pointer-events: none;
   z-index: 2;
+  animation: v25-twinkle 2.6s ease-in-out infinite;
 }
+.v25-tk-star-a { left: 7%; }
+.v25-tk-star-b { right: 7%; animation-delay: 1.1s; }
+@keyframes v25-twinkle {
+  0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.4; }
+  50% { transform: scale(1.15) rotate(45deg); opacity: 1; }
+}
+
+/* ── Scratch panel ───────────────────────────────────────────────────── */
+.v25-scratch-zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(150px, 24vw, 200px);
+  padding: 20px 18px;
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 40%, #fffef6 0%, #fff4cd 70%, #ffeaa5 100%);
+  box-shadow:
+    inset 0 3px 10px rgba(120, 75, 0, 0.28),
+    inset 0 0 0 2px rgba(122, 75, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.v25-scratch-zone .visl25-cta-headline {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: clamp(27px, 6.4vw, 50px);
+}
+
+/* The complete offer is inside the scratch area and remains covered by the foil. */
+.v25-scratch-zone {
+  flex-direction: column;
+  gap: 0;
+  min-height: clamp(300px, 42vw, 390px);
+  padding: clamp(22px, 4vw, 34px) clamp(16px, 4vw, 32px);
+}
+.v25-scratch-zone .v25-scratch-copy,
+.v25-scratch-zone .v25-scratch-apply,
+.v25-scratch-zone .v25-scratch-barcode {
+  position: relative;
+  z-index: 1;
+}
+.v25-scratch-zone .v25-scratch-copy {
+  max-width: 560px;
+  margin: 18px auto 24px;
+  font-size: clamp(14px, 1.8vw, 17px);
+  line-height: 1.6;
+  font-weight: 600;
+  color: #5c3b00;
+  text-wrap: balance;
+}
+.v25-scratch-zone .v25-scratch-apply {
+  margin: 2px auto 0;
+}
+.v25-scratch-zone .v25-scratch-barcode {
+  width: min(260px, 70%);
+  margin: 22px auto 0;
+}
+.v25-scratch-zone .v25-apply-golden {
+  background: linear-gradient(120deg, #173b80 0%, #245ac4 35%, #4387ff 50%, #245ac4 68%, #173b80 100%);
+  background-size: 220% 100%;
+  border: 2px solid #fff1b8;
+  border-radius: 16px 999px 999px 16px;
+  box-shadow: 0 10px 0 #9b680b, 0 15px 25px rgba(16, 42, 88, .3), inset 0 1px 0 rgba(255,255,255,.4);
+  animation: v25-apply-gradient-dance 3.5s ease-in-out infinite;
+}
+.v25-scratch-zone .v25-apply-golden:hover {
+  transform: translateY(-4px) rotate(-1deg) scale(1.05);
+  box-shadow: 0 13px 0 #9b680b, 0 20px 30px rgba(16,42,88,.35), inset 0 1px 0 rgba(255,255,255,.45);
+}
+.v25-scratch-zone .v25-apply-golden .visl25-btn-arrow {
+  display: inline-grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #ffd45a;
+  color: #173b80;
+  font-size: 14px;
+  animation: v25-apply-star-spin 4s linear infinite;
+}
+@keyframes v25-apply-gradient-dance {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+@keyframes v25-apply-star-spin {
+  0%, 75%, 100% { transform: rotate(0deg) scale(1); }
+  85% { transform: rotate(25deg) scale(1.15); }
+}
+@media (max-width: 520px) {
+  .v25-scratch-zone { min-height: 340px; padding: 22px 14px; }
+  .v25-scratch-zone .v25-scratch-copy { margin: 16px auto 20px; }
+  .v25-scratch-zone .v25-apply-golden { padding: 14px 25px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v25-scratch-zone .v25-apply-golden,
+  .v25-scratch-zone .v25-apply-golden .visl25-btn-arrow { animation: none; }
+}
+
+.v25-scratch-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  touch-action: none; /* lets a finger scratch instead of scrolling the page */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='12' fill='%23fbbf24' stroke='%23b45309' stroke-width='2'/%3E%3Ccircle cx='14' cy='14' r='7' fill='none' stroke='%23b45309' stroke-width='1.5'/%3E%3C/svg%3E") 14 14,
+    crosshair;
+}
+
+.v25-foil-shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.v25-foil-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: skewX(-20deg);
+  animation: v25-foil-sweep 3.2s ease-in-out infinite;
+}
+@keyframes v25-foil-sweep {
+  0% { left: -60%; }
+  55%, 100% { left: 130%; }
+}
+
+.v25-reveal-flash {
+  position: absolute;
+  inset: -20%;
+  z-index: 2;
+  background: radial-gradient(circle, rgba(255, 236, 150, 0.95) 0%, rgba(255, 214, 90, 0.5) 35%, transparent 65%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.v25-flake-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+}
+.v25-flake {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, #fff3b0, #e0a421);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.v25-scratch-hint {
+  position: absolute;
+  top: 62%;
+  left: 0;
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(80, 45, 0, 0.45));
+  will-change: transform, opacity;
+}
+.v25-scratch-hint svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Note row under the panel. Fixed height so swapping the button for the message never shifts the layout. */
+.v25-ticket-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  margin-top: 6px;
+}
+.v25-reveal-skip {
+  appearance: none;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--tk-ink);
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.v25-reveal-skip:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+.v25-reveal-skip:focus-visible {
+  outline: 2px solid #245ac4;
+  outline-offset: 2px;
+}
+.v25-unlocked-note {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a5300;
+  animation: v25-note-in 0.5s ease both;
+}
+@keyframes v25-note-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Headline letters (animated by GSAP when the foil comes off) ─────── */
 .v25-letter-headline {
   position: relative;
   z-index: 2;
+  max-width: 100%;
   perspective: 700px;
   font-family: var(--ff-display, 'Cormorant', Georgia, serif);
   font-style: italic;
   font-weight: 700;
+  line-height: 1.2;
+  overflow: visible;
+  text-wrap: balance;
 }
 .v25-letter-word { display: inline; white-space: nowrap; }
 .v25-letter {
@@ -659,77 +1143,222 @@
 .v25-letter-number {
   display: inline-block;
   color: #245ac4;
-  text-shadow: 0 4px 0 rgba(36, 90, 196, .1);
+  text-shadow: 0 4px 0 rgba(36, 90, 196, 0.1);
 }
-/* The shimmer background cannot paint individually split glyphs reliably; give each letter its own visible fill. */
+/* The shimmer background cannot paint individually split glyphs reliably; give each letter its own fill. */
 .v25-letter-gradient-glyph {
   color: #245ac4;
   -webkit-text-fill-color: #245ac4;
   background: none;
-  text-shadow: 0 1px 0 rgba(36, 90, 196, .05);
-}
-.v25-letter-headline .v25-letter-word:last-child {
-  white-space: nowrap;
-}
-.v25-letter-headline {
-  max-width: 100%;
-  line-height: 1.2;
-  overflow: visible;
-  text-wrap: balance;
+  text-shadow: 0 1px 0 rgba(36, 90, 196, 0.05);
 }
 
-.v25-cta-orbit-art {
-  position: absolute !important;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 1 !important;
+/* ── Stub: copy + Apply button ───────────────────────────────────────── */
+.v25-ticket-stub .visl25-cta-sub {
+  max-width: 560px;
+  margin: 0 auto 26px;
+  font-weight: 500;
+  color: #5c3b00;
 }
-.v25-cta-orbit-art svg {
+
+.v25-apply-wrap {
+  position: relative;
+  display: inline-block;
+  will-change: transform;
+}
+.v25-apply-pulse {
+  position: relative;
+  display: inline-block;
+  will-change: transform;
+}
+
+.v25-apply-golden {
+  position: relative;
+  z-index: 2;
+  padding: 17px 46px;
+  font-size: clamp(15px, 4.2vw, 18px);
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1d4590 0%, #102a58 55%, #1d4590 100%);
+  border: 2px solid #ffd45a;
+  box-shadow:
+    0 12px 26px rgba(16, 42, 88, 0.45),
+    0 0 0 4px rgba(255, 255, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, filter 0.2s ease;
+}
+/* Light sweep across the button */
+.v25-apply-golden::after {
+  content: '';
   position: absolute;
-  display: block;
-  height: auto;
-  overflow: visible;
+  top: 0;
+  bottom: 0;
+  left: -70%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: skewX(-22deg);
+  pointer-events: none;
+  animation: v25-btn-shine 3s ease-in-out infinite;
 }
-.v25-cta-orbit {
-  width: clamp(72px, 9vw, 118px) !important;
-  height: auto !important;
-  top: 10%;
-  right: 7%;
-  color: #4387ff;
-  opacity: .7;
-  transform-origin: 50% 50%;
+@keyframes v25-btn-shine {
+  0% { left: -70%; }
+  45%, 100% { left: 140%; }
 }
-.v25-cta-spark {
-  width: 28px !important;
-  height: 28px !important;
+.v25-apply-golden:hover {
+  background: linear-gradient(135deg, #2552ad 0%, #14336b 55%, #2552ad 100%);
+  border-color: #ffe28a;
+  transform: translateY(-3px) scale(1.04);
+  box-shadow:
+    0 18px 34px rgba(16, 42, 88, 0.5),
+    0 0 0 5px rgba(255, 255, 255, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-.v25-cta-spark-a { top: 18%; left: 8%; }
-.v25-cta-spark-b { right: 13%; bottom: 18%; width: 22px !important; height: 22px !important; }
-.v25-cta-film-doodle {
-  width: 62px !important;
-  height: 48px !important;
-  left: 7%;
-  bottom: 15%;
-  color: #245ac4;
-  opacity: .78;
-  transform-origin: 50% 50%;
+.v25-apply-golden:active {
+  transform: translateY(0) scale(0.97);
 }
-@media (max-width: 650px) {
-  .v25-cta-orbit { width: 60px !important; top: 5%; right: 3%; opacity: .4; }
-  .v25-cta-spark-a { top: 10%; left: 3%; width: 20px !important; height: 20px !important; }
-  .v25-cta-spark-b { right: 5%; bottom: 10%; width: 17px !important; height: 17px !important; }
-  .v25-cta-film-doodle { width: 44px !important; height: 34px !important; left: 3%; bottom: 8%; }
+.v25-apply-golden:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
 }
-/* Reduced Motion */
-@media (prefers-reduced-motion: reduce) {
-  .v25-letter { will-change: auto; }
+.v25-apply-golden .visl25-btn-arrow {
+  font-size: 20px;
+  color: #ffd45a;
+  animation: v25-arrow-nudge 1.4s ease-in-out infinite;
+}
+@keyframes v25-arrow-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
 }
 
+/* Ripple rings + sparkles: only after the reveal */
+.v25-btn-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+  opacity: 0;
+  pointer-events: none;
+}
+.v25-ticket-wrap[data-revealed='true'] .v25-btn-ring {
+  animation: v25-btn-ring 2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+.v25-ticket-wrap[data-revealed='true'] .v25-btn-ring-b {
+  animation-delay: 1s;
+}
+@keyframes v25-btn-ring {
+  0% { transform: scale(1); opacity: 0.85; }
+  100% { transform: scale(1.3, 1.85); opacity: 0; }
+}
+
+.v25-btn-spark {
+  position: absolute;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  opacity: 0;
+  pointer-events: none;
+}
+.v25-btn-spark-a { top: -12px; left: 8%; }
+.v25-btn-spark-b { top: -8px; right: 10%; }
+.v25-btn-spark-c { bottom: -10px; left: 22%; }
+.v25-btn-spark-d { bottom: -12px; right: 6%; }
+.v25-ticket-wrap[data-revealed='true'] .v25-btn-spark {
+  animation: v25-twinkle 1.8s ease-in-out infinite;
+}
+.v25-ticket-wrap[data-revealed='true'] .v25-btn-spark-b { animation-delay: 0.45s; }
+.v25-ticket-wrap[data-revealed='true'] .v25-btn-spark-c { animation-delay: 0.9s; }
+.v25-ticket-wrap[data-revealed='true'] .v25-btn-spark-d { animation-delay: 1.35s; }
+
+.v25-barcode {
+  max-width: 260px;
+  height: 22px;
+  margin: 24px auto 0;
+  opacity: 0.5;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #5c3b00 0 2px,
+    transparent 2px 5px,
+    #5c3b00 5px 6px,
+    transparent 6px 10px,
+    #5c3b00 10px 13px,
+    transparent 13px 16px
+  );
+}
+
+/* Confetti burst (pooled, hidden until the reveal) */
+.v25-confetti-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.v25-confetti {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.v25-confetti-c0 { background: #fbbf24; }
+.v25-confetti-c1 { background: #4387ff; }
+.v25-confetti-c2 { background: #ff8a70; }
+.v25-confetti-c3 { background: #10b981; }
+.v25-confetti-c4 { background: #7c3aed; }
+.v25-confetti-s0 { border-radius: 50%; }
+.v25-confetti-s1 { width: 14px; height: 5px; border-radius: 1px; }
+.v25-confetti-s2 { clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+
+/* ── Ticket: mobile ──────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .v25-ticket-wrap { --tk-notch: 10px; }
+  .v25-ticket-main {
+    padding: 16px 12px 4px;
+    border-radius: 18px 18px 0 0;
+  }
+  .v25-ticket-stub {
+    padding: 24px 16px 20px;
+    border-radius: 0 0 18px 18px;
+  }
+  .v25-ticket-topbar {
+    margin-bottom: 12px;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+  }
+  .v25-ticket-topbar-mid,
+  .v25-tk-star { display: none; }
+  .v25-scratch-zone {
+    min-height: 150px;
+    padding: 16px 10px;
+  }
+  .v25-ticket-stub .visl25-cta-sub { margin-bottom: 22px; }
+  .v25-apply-wrap,
+  .v25-apply-pulse {
+    display: block;
+    width: 100%;
+  }
+  .v25-apply-golden {
+    width: 100%;
+    padding: 17px 24px;
+  }
+  .v25-barcode { margin-top: 18px; }
+}
+
+/* Reduced motion: no ambient loops on the ticket (the global rule below also covers this) */
 @media (prefers-reduced-motion: reduce) {
-  .v25-cta-orbit, .v25-cta-spark, .v25-cta-film-doodle { animation: none !important; }
+  .visl25-cta-section::before,
+  .v25-tk-star,
+  .v25-foil-shimmer::before,
+  .v25-apply-golden::after,
+  .v25-apply-golden .visl25-btn-arrow,
+  .v25-btn-ring,
+  .v25-btn-spark { animation: none !important; }
   .v25-letter { will-change: auto; }
 }
 
@@ -742,20 +1371,12 @@
   }
 }
 
-
-
-
-
-/* The guiding ribbon is a background layer; content cards always sit above it. */
+/* The film strip is a background layer; content (and every card) always sits above it. */
 .visl25-container > section,
-.visl25-container > .visl25-cta-box,
-.visl25-container .visl25-card,
-.visl25-container .v25-seat-cta {
+.visl25-container .visl25-card {
   position: relative;
   z-index: 1;
 }
-.visl25-guiding-line-canvas { z-index: 0 !important; }
-.visl25-guiding-line-glow { pointer-events: none; }
 
 /* Slow, low-amplitude ambient floating: gentle drift, never rapid back-and-forth. */
 @keyframes v25-ambient-float-a {
@@ -786,22 +1407,418 @@
   .visl25-ambient-decor .v25-ambient-drift { animation: none !important; }
 }
 
-/* Bring the orbit into the "Seats" headline */
-.v25-cta-orbit {
-  right: 19% !important;
-  top: 10% !important;
-  width: clamp(74px, 8vw, 100px) !important;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.v25-letter-headline {
+/* ── Wooden treasure-chest Apply CTA inside scratch-to-reveal panel ── */
+.v25-scratch-zone .v25-treasure-chest-btn {
   position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 206px;
+  min-height: 104px;
+  margin-top: 30px;
+  padding: 49px 22px 13px;
+  overflow: visible;
+  border: 3px solid #d8a84a;
+  border-radius: 5px 5px 13px 13px;
+  color: #fff2c7;
+  text-decoration: none;
+  background:
+    linear-gradient(90deg, transparent 0 10%, #e8bd5a 10% 15%, transparent 15% 28%, rgba(48,22,10,.45) 28% 30%, transparent 30% 48%, #e8bd5a 48% 53%, transparent 53% 70%, rgba(48,22,10,.45) 70% 72%, transparent 72% 85%, #e8bd5a 85% 90%, transparent 90%),
+    repeating-linear-gradient(0deg, transparent 0 20px, rgba(48,22,10,.22) 20px 22px),
+    linear-gradient(180deg, #bd7843 0%, #914a25 50%, #693319 100%);
+  box-shadow: inset 0 3px 0 rgba(255,235,178,.45), inset 0 -8px 0 rgba(47,20,8,.32), 0 7px 0 #49230f, 0 13px 22px rgba(48,25,10,.34);
+  transform-origin: center bottom;
+  animation: v25-chest-bob 3s ease-in-out infinite;
+  transition: transform .22s ease, filter .22s ease, box-shadow .22s ease;
+}
+/* Domed wooden lid */
+.v25-scratch-zone .v25-treasure-chest-btn::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  left: -4px;
+  right: -4px;
+  top: -31px;
+  height: 53px;
+  border: 3px solid #e8bd5a;
+  border-bottom-width: 5px;
+  border-radius: 58% 58% 8px 8px / 90% 90% 12px 12px;
+  background:
+    linear-gradient(90deg, transparent 0 12%, #e2b04c 12% 17%, transparent 17% 32%, rgba(61,29,13,.55) 32% 34%, transparent 34% 66%, rgba(61,29,13,.55) 66% 68%, transparent 68% 83%, #e2b04c 83% 88%, transparent 88%),
+    repeating-linear-gradient(0deg, transparent 0 12px, rgba(61,27,12,.3) 12px 14px),
+    linear-gradient(180deg, #d18b4d 0%, #a45a2c 55%, #7b3b1c 100%);
+  box-shadow: inset 0 5px 0 rgba(255,231,166,.5), inset 0 -5px 0 rgba(53,22,9,.28), 0 5px 0 #51270f;
+  transform: perspective(130px) rotateX(5deg);
+  transform-origin: bottom center;
+  transition: transform .25s ease;
+}
+/* Front-mounted gold lock plate */
+.v25-scratch-zone .v25-treasure-chest-btn::after {
+  content: '';
+  position: absolute;
   z-index: 2;
+  left: 50%;
+  top: 13px;
+  width: 27px;
+  height: 31px;
+  transform: translateX(-50%);
+  border: 3px solid #f8d878;
+  border-radius: 5px 5px 7px 7px;
+  background: radial-gradient(circle at 50% 34%, #593016 0 3px, transparent 3.5px), linear-gradient(90deg, rgba(255,255,255,.25), transparent 40%), linear-gradient(135deg, #f8dc7b, #b77a25);
+  box-shadow: 0 2px 4px rgba(38,17,5,.55), inset 0 0 0 2px rgba(119,72,18,.25);
+  pointer-events: none;
+}
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-lid { display: none; }
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-lock {
+  position: absolute; z-index: 3; top: 19px; left: 50%; width: 7px; height: 10px;
+  transform: translateX(-50%); border-radius: 50% 50% 2px 2px; background: #704017;
+  box-shadow: 0 0 0 1px rgba(255,236,164,.55); pointer-events: none;
+}
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label {
+  position: relative; z-index: 4; font-family: 'Poppins', sans-serif; font-size: 15px;
+  font-weight: 900; letter-spacing: .035em; text-shadow: 0 2px 0 rgba(52,22,7,.7);
+}
+.v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow {
+  position: relative; z-index: 4; display: inline-grid; place-items: center; width: 21px; height: 21px;
+  border-radius: 50%; background: #ffe7a0; color: #794018; font-size: 13px;
+  animation: v25-apply-star-spin 4s linear infinite;
+}
+.v25-scratch-zone .v25-treasure-chest-btn:hover {
+  filter: brightness(1.08); transform: translateY(-5px) rotate(-1deg) scale(1.04);
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.3), inset 0 -7px 0 rgba(80,35,7,.2), 0 12px 0 #49230f, 0 20px 28px rgba(48,25,10,.38);
+}
+.v25-scratch-zone .v25-treasure-chest-btn:hover::before { transform: perspective(130px) rotateX(23deg) translateY(-4px); }
+.v25-scratch-zone .v25-treasure-chest-btn:active { transform: translateY(3px) scale(.98); box-shadow: inset 0 3px 0 rgba(255,255,255,.25), 0 3px 0 #49230f, 0 6px 12px rgba(48,25,10,.25); }
+@keyframes v25-chest-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+@media (prefers-reduced-motion: reduce) {
+  .v25-scratch-zone .v25-treasure-chest-btn, .v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow { animation: none; }
 }
 
-/* Keep the circle behind the final letters */
-.v25-cta-orbit-art {
-  z-index: 1;
-  pointer-events: none;
+/* Photorealistic treasure chest CTA artwork. Keep the image in public/assets/visl-treasure-chest.png. */
+.v25-scratch-zone .v25-treasure-chest-btn {
+  width: min(340px, 82vw);
+  min-width: 0;
+  height: 232px;
+  min-height: 0;
+  box-sizing: border-box;
+  display: block;
+  padding: 0;
+  margin: 34px auto 10px;
+  overflow: visible;
+  border: 0;
+  border-radius: 12px;
+  color: #fff0bd;
+  background: url('/assets/visl-treasure-chest.png') center 49% / 112% auto no-repeat;
+  box-shadow: none;
+  filter: drop-shadow(0 12px 12px rgba(24, 12, 5, .32));
+  animation: v25-chest-bob 3.2s ease-in-out infinite;
+  transition: transform .25s ease, filter .25s ease;
+}
+.v25-scratch-zone .v25-treasure-chest-btn::before,
+.v25-scratch-zone .v25-treasure-chest-btn::after,
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-lid,
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-lock { display: none; }
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 31px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  padding: 10px 19px 11px;
+  border: 2px solid #f7d477;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #6f3b17 0%, #3b1c0b 100%);
+  box-shadow: inset 0 1px 0 rgba(255,239,181,.45), 0 3px 8px rgba(0,0,0,.55);
+  color: #ffe7a0;
+  font-family: var(--ff-display, Georgia, serif);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  line-height: 1;
+  text-shadow: 0 1px 2px #241006;
+  white-space: nowrap;
+}
+.v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow {
+  position: absolute;
+  z-index: 4;
+  right: 27%;
+  bottom: 39px;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  color: #ffe7a0;
+  background: transparent;
+  font-size: 14px;
+  animation: none;
+}
+.v25-scratch-zone .v25-treasure-chest-btn:hover {
+  transform: translateY(-5px) scale(1.035);
+  filter: brightness(1.08) drop-shadow(0 17px 15px rgba(24, 12, 5, .42));
+  box-shadow: none;
+}
+.v25-scratch-zone .v25-treasure-chest-btn:active {
+  transform: translateY(1px) scale(.99);
+  filter: brightness(.98) drop-shadow(0 7px 7px rgba(24, 12, 5, .3));
+}
+@media (max-width: 600px) {
+  .v25-scratch-zone .v25-treasure-chest-btn {
+    width: min(300px, 88vw);
+    height: 205px;
+    background-size: 116% auto;
+  }
+  .v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label { bottom: 27px; font-size: 14px; }
+  .v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow { bottom: 34px; right: 25%; }
+}
+
+/* Final refinement: smaller, sleeker treasure-chest Apply Now CTA */
+.v25-scratch-zone .v25-treasure-chest-btn {
+  width: min(230px, 66vw);
+  height: 158px;
+  margin: 22px auto 6px;
+  background-size: 108% auto;
+  background-position: center 49%;
+  border-radius: 8px;
+  filter: drop-shadow(0 7px 8px rgba(24, 12, 5, .25));
+  animation: none;
+  transition: transform .22s ease, filter .22s ease;
+}
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label {
+  bottom: 20px;
+  min-width: 0;
+  padding: 7px 12px 8px;
+  border-width: 1px;
+  border-radius: 4px;
+  font-size: 12px;
+  letter-spacing: .045em;
+  box-shadow: inset 0 1px 0 rgba(255,239,181,.35), 0 2px 5px rgba(0,0,0,.45);
+}
+.v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow {
+  right: 25%;
+  bottom: 26px;
+  width: 12px;
+  height: 12px;
+  font-size: 10px;
+}
+.v25-scratch-zone .v25-treasure-chest-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  filter: brightness(1.05) drop-shadow(0 10px 9px rgba(24, 12, 5, .3));
+}
+.v25-scratch-zone .v25-treasure-chest-btn:active {
+  transform: translateY(1px) scale(.99);
+}
+@media (max-width: 600px) {
+  .v25-scratch-zone .v25-treasure-chest-btn {
+    width: min(190px, 62vw);
+    height: 132px;
+    margin-top: 18px;
+    background-size: 112% auto;
+  }
+  .v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label {
+    bottom: 16px;
+    padding: 6px 10px 7px;
+    font-size: 11px;
+  }
+  .v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow {
+    bottom: 21px;
+    right: 24%;
+    font-size: 9px;
+  }
+}
+
+/* Compact chest CTA: smaller footprint, with a high-contrast readable plaque */
+.v25-scratch-zone .v25-treasure-chest-btn {
+  width: min(168px, 48vw);
+  height: 116px;
+  min-height: 0;
+  margin: 14px auto 4px;
+  background-size: 112% auto;
+  background-position: center 49%;
+  filter: drop-shadow(0 5px 6px rgba(24, 12, 5, .24));
+}
+.v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label {
+  left: 50%;
+  bottom: 13px;
+  min-width: 0;
+  padding: 6px 11px 7px;
+  border: 1.5px solid #ffe08a;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #51280f 0%, #241006 100%);
+  color: #fff3c5;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .035em;
+  text-shadow: 0 1px 2px #160802;
+  box-shadow: inset 0 1px 0 rgba(255,239,181,.35), 0 2px 5px rgba(0,0,0,.6);
+}
+.v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow {
+  right: 24%;
+  bottom: 17px;
+  width: 11px;
+  height: 11px;
+  font-size: 9px;
+  color: #ffe8a3;
+}
+.v25-scratch-zone .v25-treasure-chest-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.04) drop-shadow(0 7px 7px rgba(24, 12, 5, .3));
+}
+@media (max-width: 600px) {
+  .v25-scratch-zone .v25-treasure-chest-btn {
+    width: min(145px, 46vw);
+    height: 102px;
+    margin-top: 12px;
+    background-size: 116% auto;
+  }
+  .v25-scratch-zone .v25-treasure-chest-btn .v25-chest-label {
+    bottom: 11px;
+    padding: 5px 9px 6px;
+    font-size: 11px;
+  }
+  .v25-scratch-zone .v25-treasure-chest-btn .visl25-btn-arrow {
+    bottom: 14px;
+    right: 22%;
+    font-size: 8px;
+  }
+}
+
+
+/* Golden ticket refinement: restrained motion and a clean, native Visl CTA. */
+.v25-ticket-wrap {
+  filter: drop-shadow(0 14px 22px rgba(150, 95, 0, 0.18)) drop-shadow(0 3px 7px rgba(18, 42, 74, 0.08));
+  transition: filter 450ms ease;
+}
+.v25-ticket-main,
+.v25-ticket-stub {
+  transition: box-shadow 450ms ease, filter 450ms ease;
+}
+.v25-letter-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  column-gap: 0.22em;
+  row-gap: 0.04em;
+}
+.v25-letter-word {
+  display: inline-block;
+}
+.v25-scratch-copy {
+  max-width: 540px;
+  margin-inline: auto;
+}
+.v25-scratch-zone .v25-apply-golden {
+  min-width: 0;
+  min-height: 0;
+  margin-top: 0;
+  padding: 13px 26px;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(115deg, #173b80 0%, #245ac4 52%, #3978e8 100%);
+  box-shadow: 0 7px 18px rgba(36, 90, 196, 0.24), inset 0 1px 0 rgba(255,255,255,.24);
+  animation: none;
+  overflow: hidden;
+  transition: transform 260ms cubic-bezier(.2,.75,.25,1), box-shadow 260ms ease, background 260ms ease;
+}
+.v25-scratch-zone .v25-apply-golden:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(115deg, #14346f 0%, #1d4fae 52%, #2d6bd5 100%);
+  box-shadow: 0 10px 22px rgba(36, 90, 196, 0.28), inset 0 1px 0 rgba(255,255,255,.24);
+}
+.v25-scratch-zone .v25-apply-golden .visl25-btn-arrow {
+  display: inline-block;
+  font-size: 16px;
+  transition: transform 240ms ease;
+}
+.v25-scratch-zone .v25-apply-golden:hover .visl25-btn-arrow {
+  transform: translateX(3px);
+}
+.v25-apply-wrap,
+.v25-apply-pulse {
+  will-change: auto;
+}
+.v25-apply-pulse {
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .v25-ticket-wrap,
+  .v25-ticket-main,
+  .v25-ticket-stub,
+  .v25-scratch-zone .v25-apply-golden,
+  .v25-scratch-zone .v25-apply-golden .visl25-btn-arrow {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+/* Final Golden Ticket refinement: original brown-and-gold CTA, compact layout, honest application copy. */
+.v25-scratch-zone {
+  min-height: clamp(245px, 31vw, 300px);
+  padding: clamp(18px, 3vw, 25px) clamp(16px, 3vw, 28px);
+}
+.v25-scratch-zone .v25-scratch-copy {
+  max-width: 500px;
+  margin: 12px auto 16px;
+  line-height: 1.45;
+}
+.v25-scratch-zone .v25-scratch-barcode {
+  margin-top: 14px;
+  height: 16px;
+}
+.v25-scratch-zone .v25-apply-golden {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 13px 30px;
+  gap: 0;
+  color: #fff2c7;
+  background: linear-gradient(180deg, #8b5428 0%, #6b3c1e 52%, #4c2916 100%);
+  border: 2px solid #d8a84a;
+  border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 239, 181, .35), 0 4px 0 #3c2113, 0 8px 16px rgba(48, 25, 10, .24);
+  font-family: var(--ff-display, Georgia, serif);
+  font-weight: 800;
+  letter-spacing: .04em;
+  animation: none;
+  transition: transform .22s ease, box-shadow .22s ease, filter .22s ease;
+}
+.v25-scratch-zone .v25-apply-golden::after {
+  animation: none;
+  display: none;
+}
+.v25-scratch-zone .v25-apply-golden:hover {
+  color: #fff8df;
+  background: linear-gradient(180deg, #9a6232 0%, #754522 55%, #573019 100%);
+  border-color: #f0cb71;
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 rgba(255, 239, 181, .4), 0 6px 0 #3c2113, 0 11px 18px rgba(48, 25, 10, .28);
+}
+.v25-scratch-zone .v25-apply-golden:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 rgba(255, 239, 181, .25), 0 2px 0 #3c2113, 0 4px 8px rgba(48, 25, 10, .2);
+}
+.v25-scratch-zone .v25-apply-golden .visl25-btn-arrow { display: none !important; }
+.v25-unlocked-note {
+  max-width: 440px;
+  margin: 10px auto 0;
+  color: #6b3c1e;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .v25-scratch-zone { min-height: 250px; padding: 18px 14px; }
+  .v25-scratch-zone .v25-scratch-copy { margin: 10px auto 14px; }
+  .v25-scratch-zone .v25-apply-golden { min-height: 44px; padding: 11px 26px; }
 }

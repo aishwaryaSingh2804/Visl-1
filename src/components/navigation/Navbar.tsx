@@ -152,8 +152,7 @@ export function Navbar() {
               }`}
               onClick={closeMenu}
             >
-              <span className="visl-25-nav-dot" />
-              Visl 25
+              <span className="visl-25-ticket" aria-hidden="true"><span>VISL</span><strong>25</strong></span>
             </Link>
           </div>
         </nav>
