@@ -33,7 +33,7 @@ const BENEFITS: BenefitItem[] = [
     stat: '$130',
     statLabel: 'FREE CREDITS',
     boldHeading: 'In free credits',
-    bodyText: 'to make your first films on Visl, on us.',
+    bodyText: 'to start with to make your first films on Visl, on us.',
     fx: 'coins',
   },
   {
@@ -41,9 +41,9 @@ const BENEFITS: BenefitItem[] = [
     num: '02',
     stat: '0.10%',
     statLabel: 'FOUNDING EQUITY',
-    boldHeading: 'Early access to everything',
+    boldHeading: 'Early access to everything.',
     bodyText:
-      '+ Founding Creator Partnership equity for select top creators (subject to approval) + New features and models first.',
+      'New features and models before anyone else.',
     fx: 'pie',
   },
   {
@@ -52,16 +52,16 @@ const BENEFITS: BenefitItem[] = [
     stat: 'DIRECT',
     statLabel: 'VIP COMMUNITY',
     boldHeading: 'Private Discord community',
-    bodyText: 'to build with the team and creators.',
+    bodyText: 'to build alongside the team and fellow creators.',
     fx: 'chat',
   },
   {
     id: 'benefit-4',
     num: '04',
     stat: '25 SEATS',
-    statLabel: 'GLOBAL SPOTLIGHT',
-    boldHeading: 'Featured by Visl',
-    bodyText: 'On our channels and website.',
+    statLabel: 'WE GROW TOGETHER',
+    boldHeading: 'We feature your work to grow your channel; ',
+    bodyText: 'your stories help grow Visl.',
     fx: 'ticket',
   },
   {
@@ -69,8 +69,8 @@ const BENEFITS: BenefitItem[] = [
     num: '05',
     stat: 'TOP 10',
     statLabel: 'CREATOR LAURELS',
-    boldHeading: 'Bonus credits',
-    bodyText: 'for standout creators.',
+    boldHeading: 'Bonus credits for the top 10.',
+    bodyText: `Extra credits for the program's standout creators.`,
     fx: 'laurel',
   },
 ];
@@ -468,8 +468,8 @@ interface ReelLayout {
   H: number;
   left: number; // content column left edge
   right: number; // content column right edge
-  gap1: Band | null; // blank band between header and benefits
-  gap2: Band | null; // blank band between benefits and final CTA
+  gap1: Band | null; // blank band between the hero (with the golden ticket) and the benefits
+  gap2: Band | null; // blank band between the benefits and the "Who should apply" section
   yStart: number;
   yEnd: number;
 }
@@ -493,12 +493,15 @@ interface ReelGeometry {
 function buildReel(L: ReelLayout): ReelGeometry {
   const { W } = L;
   const gutter = Math.max(0, Math.min(L.left, W - L.right));
-  const strip = clampN(gutter * 0.11, 8, 26);
-  const camW = clampN(gutter * 0.3, 26, 80);
+  // Never let the camera shrink below a readable size, even when the gutters are only ~30px (phones).
+  const strip = clampN(gutter * 0.11, 11, 26);
+  const camW = clampN(gutter * 0.3, 56, 80);
   const k = camW / CAM_ART_W;
 
-  // Lane x: as close to the content as the camera's lens allows, but never off-screen.
-  const xL = Math.max(gutter - CAM_FRONT * k - 4, CAM_BACK * k + 1, strip / 2 + 2);
+  // Lane x: as close to the content as the camera's lens allows. On narrow screens the gutter cannot
+  // hold the whole camera, so the rear (viewfinder) may tuck ~30% off the screen edge and the lens hood
+  // slides a little behind the content layer (the camera is always under the text, so it never covers it).
+  const xL = Math.max(gutter - CAM_FRONT * k - 4, CAM_BACK * k * 0.7, strip / 2 + 2);
   const xR = W - xL;
 
   // Lane loops (only when the gutter is wide enough to hold them)
@@ -599,12 +602,25 @@ function buildReel(L: ReelLayout): ReelGeometry {
   push(xL, L.yStart);
   mark(L.yStart);
 
-  if (L.gap1 && L.gap2) {
-    lane(xL, L.gap1.top, -1, L.gap1.top - CROSS_LEAD);
-    cross(1, xR, L.gap1);
-    lane(xR, L.gap2.top, 1, L.gap2.top - CROSS_LEAD);
-    cross(-1, xL, L.gap2);
-    lane(xL, Math.max(L.yEnd, L.gap2.bottom + CROSS_LEAD + 80), -1, Math.max(L.yEnd, L.gap2.bottom + CROSS_LEAD + 80));
+  const gaps = [L.gap1, L.gap2].filter((g): g is Band => g !== null);
+  if (gaps.length) {
+    // One crossing per film break: hero -> benefits (left to right), then benefits -> "Who should
+    // apply" (right back to left). After the last crossing the strip runs down its lane and parks
+    // beside the closing "What we expect" block at the end of the page.
+    const lastGap = gaps[gaps.length - 1];
+    const yFinish = Math.max(L.yEnd, lastGap.bottom + CROSS_LEAD + 240);
+    let laneX = xL;
+    let dir = 1;
+    let sigma = -1;
+    gaps.forEach((g) => {
+      const nextX = dir === 1 ? xR : xL;
+      lane(laneX, g.top, sigma, g.top - CROSS_LEAD);
+      cross(dir, nextX, g);
+      laneX = nextX;
+      dir = -dir;
+      sigma = -sigma;
+    });
+    lane(laneX, yFinish, sigma, yFinish);
   } else {
     lane(xL, Math.max(L.yEnd, L.yStart + 200), -1, Math.max(L.yEnd, L.yStart + 200));
   }
@@ -887,9 +903,98 @@ function CameraArt() {
   );
 }
 
+// ── "Who should apply" content (copied from the program one-pager) ─────────
+type PersonaKind = 'creator' | 'storyteller';
+type WorldKind = 'kids' | 'myth' | 'history' | 'drama';
+
+const PERSONAS: Array<{ id: string; label: string; text: string; art: PersonaKind }> = [
+  {
+    id: 'persona-creator',
+    label: 'THE AI VIDEO CREATOR',
+    text: 'You already make AI video and want to move into long-form stories that hold an audience — and earn from it.',
+    art: 'creator',
+  },
+  {
+    id: 'persona-storyteller',
+    label: 'THE STORYTELLER',
+    text: 'Writer, author, storyteller or channel owner with a body of work — stories ready to become a series.',
+    art: 'storyteller',
+  },
+];
+
+const STORY_WORLDS: Array<{ label: string; icon: WorldKind }> = [
+  { label: "Kids' stories", icon: 'kids' },
+  { label: 'Mythology & folklore', icon: 'myth' },
+  { label: 'History & real-life stories', icon: 'history' },
+  { label: 'Microdramas & fiction', icon: 'drama' },
+];
+
+/** Funky line-art badge for each persona. `.v25-draw` paths are drawn in by DrawSVG on scroll. */
+function PersonaArt({ kind }: { kind: PersonaKind }) {
+  if (kind === 'creator') {
+    return (
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <rect className="v25-draw" x="4" y="14" width="28" height="22" rx="5" />
+        <path className="v25-draw" d="M32 22l11-6v16l-11-6" />
+        <path className="v25-draw" d="M15 20.5l8 4.5-8 4.5z" fill="currentColor" fillOpacity="0.25" />
+        <path d="M39 3l1.3 3.7L44 8l-3.7 1.3L39 13l-1.3-3.7L34 8l3.7-1.3z" fill="#f59e0b" stroke="none" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path className="v25-draw" d="M5 11c6-2.4 13-1.4 19 3v26c-6-4.4-13-5.4-19-3z" />
+      <path className="v25-draw" d="M43 11c-6-2.4-13-1.4-19 3v26c6-4.4 13-5.4 19-3z" />
+      <path className="v25-draw" d="M10 19c3-.5 6 0 9 1.5M10 25c3-.5 6 0 9 1.5" />
+      <path d="M39 3l1.3 3.7L44 8l-3.7 1.3L39 13l-1.3-3.7L34 8l3.7-1.3z" fill="#f59e0b" stroke="none" />
+    </svg>
+  );
+}
+
+/** Tiny icon inside each story-world chip. */
+function WorldIcon({ kind }: { kind: WorldKind }) {
+  const props = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+  switch (kind) {
+    case 'kids':
+      return (
+        <svg {...props} aria-hidden="true">
+          <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor" fillOpacity="0.25" />
+        </svg>
+      );
+    case 'myth':
+      return (
+        <svg {...props} aria-hidden="true">
+          <path d="M4 5h16M6 5v13M10 5v13M14 5v13M18 5v13M4 20h16" />
+        </svg>
+      );
+    case 'history':
+      return (
+        <svg {...props} aria-hidden="true">
+          <path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" />
+        </svg>
+      );
+    case 'drama':
+      return (
+        <svg {...props} aria-hidden="true">
+          <path d="M3 10h18v10H3zM3 10l2.5-5.5M9 10l2.5-5.5M15 10l2.5-5.5" />
+        </svg>
+      );
+  }
+}
+
 /** Golden-ticket pools: rendered once and reused, so no DOM is created while scratching. */
 const FLAKE_COUNT = 14;
 const CONFETTI_COUNT = 34;
+const TRAIL_COUNT = 14;
 
 export function Visl25Page() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -901,6 +1006,7 @@ export function Visl25Page() {
   const camSvgRef = useRef<SVGSVGElement>(null);
   const camRef = useRef<SVGGElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
+  const applyRef = useRef<HTMLElement>(null);
   // True while the card entrance animation runs, so hover tilt never fights it.
   const cardsEntering = useRef(false);
   // Golden-ticket scratch card
@@ -957,6 +1063,20 @@ export function Visl25Page() {
           duration: 0.8,
           delay: 0.5,
           ease: 'power2.out',
+        });
+      }
+
+      // 2b. Golden ticket glides in right after the description
+      const heroTicket = containerRef.current?.querySelector('.visl25-hero-ticket');
+      if (heroTicket) {
+        gsap.from(heroTicket, {
+          y: 28,
+          scale: 0.94,
+          opacity: 0,
+          duration: 0.9,
+          delay: 0.7,
+          ease: 'power3.out',
+          clearProps: 'transform,opacity',
         });
       }
 
@@ -1255,7 +1375,7 @@ export function Visl25Page() {
         const col = rel('.visl25-container');
         const g1 = rel('[data-film-gap="1"]');
         const g2 = rel('[data-film-gap="2"]');
-        const cta = rel('.v25-ticket-wrap');
+        const tail = rel('.v25-expect-col');
         return {
           W,
           H,
@@ -1264,7 +1384,7 @@ export function Visl25Page() {
           gap1: g1 ? { top: g1.top, bottom: g1.bottom } : null,
           gap2: g2 ? { top: g2.top, bottom: g2.bottom } : null,
           yStart: -30,
-          yEnd: cta ? cta.top + (cta.bottom - cta.top) * 0.5 : H - 140,
+          yEnd: tail ? tail.bottom - 60 : H - 140,
         };
       };
 
@@ -1391,13 +1511,13 @@ export function Visl25Page() {
       const flash = ticket.querySelector<HTMLElement>('.v25-reveal-flash');
       const magnet = ticket.querySelector<HTMLElement>('.v25-apply-wrap');
       const pulse = ticket.querySelector<HTMLElement>('.v25-apply-pulse');
-      const btn = ticket.querySelector<HTMLElement>('.v25-apply-golden');
+      
 
       // The headline stays hidden until the reveal plays it in.
       gsap.set(letters, { opacity: 0, transformPerspective: 700, transformOrigin: '50% 70%' });
 
       const CELL = 12; // coverage grid cell, px
-      const TRIGGER = 0.42; // fraction of the foil that must be scratched
+      const TRIGGER = 0.1; // fraction of the foil that must be scratched (10% is enough to reveal)
       let w = 0;
       let h = 0;
       let dpr = 1;
@@ -1415,7 +1535,7 @@ export function Visl25Page() {
       let hintX: gsap.core.Timeline | null = null;
       let hintY: gsap.core.Tween | null = null;
 
-      const radius = () => clampN(Math.min(w, h) * 0.17, 18, 30);
+      const radius = () => clampN(Math.min(w, h) * 0.15, 16, 26);
 
       const star4 = (x: number, y: number, r: number) => {
         ctx.beginPath();
@@ -1466,22 +1586,22 @@ export function Visl25Page() {
         ctx.strokeStyle = 'rgba(122,75,0,0.4)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([7, 5]);
-        ctx.strokeRect(9, 9, w - 18, h - 18);
+        ctx.strokeRect(7, 7, w - 14, h - 14);
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(255,255,255,0.78)';
-        star4(26, 26, 8);
-        star4(w - 26, 26, 8);
-        star4(26, h - 26, 8);
-        star4(w - 26, h - 26, 8);
+        star4(20, 20, 6);
+        star4(w - 20, 20, 6);
+        star4(20, h - 20, 6);
+        star4(w - 20, h - 20, 6);
 
         // engraved label
         const label = 'SCRATCH TO REVEAL';
-        let fs = clampN(w * 0.075, 16, 34);
+        let fs = clampN(w * 0.06, 13, 24);
         const font = (size: number, weight: number) => `${weight} ${size}px Poppins, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = font(fs, 900);
-        while (fs > 12 && ctx.measureText(label).width > w - 64) {
+        while (fs > 11 && ctx.measureText(label).width > w - 56) {
           fs -= 1;
           ctx.font = font(fs, 900);
         }
@@ -1490,9 +1610,9 @@ export function Visl25Page() {
         ctx.fillText(label, w / 2 + 1.5, cy + 2);
         ctx.fillStyle = '#fff6c9';
         ctx.fillText(label, w / 2, cy);
-        ctx.font = font(Math.max(11, fs * 0.5), 700);
+        ctx.font = font(Math.max(10, fs * 0.52), 700);
         ctx.fillStyle = 'rgba(110,66,0,0.78)';
-        ctx.fillText('apply for a chance to join Visl 25', w / 2, cy + fs * 0.95);
+        ctx.fillText('apply for a chance to join Visl 25', w / 2, cy + fs * 1.05);
       };
 
       const sizeCanvas = () => {
@@ -1794,6 +1914,375 @@ export function Visl25Page() {
     { scope: containerRef }
   );
 
+  // 12. "Who should apply / What we expect" section.
+  //     Everything here is wrapped in matchMedia: with reduced motion nothing is hidden or animated,
+  //     so the content simply shows. Hover wiggles only run on fine pointers.
+  useGSAP(
+    () => {
+      const root = applyRef.current;
+      if (!root) return;
+      const q = <T extends Element = HTMLElement>(sel: string) => gsap.utils.toArray<T>(sel, root);
+      const one = (sel: string) => root.querySelector(sel) as HTMLElement;
+      const mm = gsap.matchMedia();
+
+      mm.add(
+        {
+          motion: '(prefers-reduced-motion: no-preference)',
+          fine: '(hover: hover) and (pointer: fine)',
+        },
+        (ctx) => {
+          const conditions = (ctx.conditions ?? {}) as Record<string, boolean | undefined>;
+          if (!conditions.motion) return;
+
+          const play = 'play none none reverse';
+          const disposers: Array<() => void> = [];
+
+          // Headings drop in (same falling language as the rest of the page) + a squiggle that draws itself
+          q('.v25-apply-heading, .v25-sub-heading').forEach((h) => {
+            gsap.from(h, {
+              scrollTrigger: { trigger: h, start: 'top 88%', toggleActions: play },
+              y: -34,
+              rotation: -2,
+              opacity: 0,
+              duration: 0.8,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform,opacity',
+            });
+          });
+          q<SVGPathElement>('.v25-squiggle path').forEach((path) => {
+            gsap.fromTo(
+              path,
+              { drawSVG: '0% 0%' },
+              {
+                drawSVG: '0% 100%',
+                duration: 0.9,
+                delay: 0.3,
+                ease: 'power2.inOut',
+                scrollTrigger: { trigger: path.closest('.v25-apply-head, .v25-expect-head') as Element, start: 'top 88%', toggleActions: play },
+              }
+            );
+          });
+
+          // Persona cards: drop in at opposite tilts, icon lines draw themselves
+          gsap.from(q('.v25-persona'), {
+            scrollTrigger: { trigger: one('.v25-persona-grid'), start: 'top 82%', toggleActions: play },
+            y: -60,
+            rotation: (i: number) => (i % 2 ? 5 : -5),
+            scale: 0.92,
+            opacity: 0,
+            duration: 0.9,
+            stagger: 0.18,
+            ease: 'back.out(1.6)',
+            clearProps: 'transform,opacity',
+          });
+          gsap.fromTo(
+            q<SVGElement>('.v25-persona .v25-draw'),
+            { drawSVG: '0% 0%' },
+            {
+              drawSVG: '0% 100%',
+              duration: 1,
+              stagger: 0.1,
+              delay: 0.35,
+              ease: 'power2.inOut',
+              scrollTrigger: { trigger: one('.v25-persona-grid'), start: 'top 82%', toggleActions: play },
+            }
+          );
+
+          // Story-world chips: tumble in like loose film stickers
+          gsap.from(q('.v25-chip-slot, .v25-worlds-label'), {
+            scrollTrigger: { trigger: one('.v25-worlds'), start: 'top 90%', toggleActions: play },
+            y: -70,
+            rotation: () => gsap.utils.random(-18, 18),
+            scale: 0.5,
+            opacity: 0,
+            duration: 0.9,
+            stagger: { each: 0.1, from: 'random' },
+            ease: 'bounce.out',
+            clearProps: 'transform,opacity',
+          });
+
+          // What we expect: items slide in, arrows keep nudging forward, key phrases get highlighted
+          gsap.from(q('.v25-expect-item'), {
+            scrollTrigger: { trigger: one('.v25-expect-list'), start: 'top 86%', toggleActions: play },
+            x: -50,
+            opacity: 0,
+            duration: 0.7,
+            stagger: 0.14,
+            ease: 'power3.out',
+            clearProps: 'transform,opacity',
+          });
+          gsap.to(q('.v25-expect-bullet'), {
+            x: 5,
+            duration: 0.7,
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            stagger: 0.18,
+          });
+          q('.v25-mark').forEach((m) => {
+            gsap.fromTo(
+              m,
+              { backgroundSize: '0% 42%' },
+              {
+                backgroundSize: '100% 42%',
+                duration: 0.8,
+                delay: 0.4,
+                ease: 'power2.out',
+                scrollTrigger: { trigger: m, start: 'top 88%', once: true },
+              }
+            );
+          });
+
+          // WIN-WIN note: box rises, badge pops with an elastic bounce, trend line draws
+          gsap.from(q('.v25-winwin'), {
+            scrollTrigger: { trigger: one('.v25-winwin'), start: 'top 95%', toggleActions: play },
+            y: 30,
+            opacity: 0,
+            duration: 0.7,
+            ease: 'power3.out',
+            clearProps: 'transform,opacity',
+          });
+          gsap.from(q('.v25-winwin-badge'), {
+            scrollTrigger: { trigger: one('.v25-winwin'), start: 'top 95%', toggleActions: play },
+            scale: 0,
+            rotation: -24,
+            duration: 0.9,
+            delay: 0.35,
+            ease: 'elastic.out(1, 0.5)',
+            clearProps: 'transform',
+          });
+          gsap.fromTo(
+            q<SVGPathElement>('.v25-winwin-trend'),
+            { drawSVG: '0% 0%' },
+            {
+              drawSVG: '0% 100%',
+              duration: 0.8,
+              delay: 0.7,
+              ease: 'power2.inOut',
+              scrollTrigger: { trigger: one('.v25-winwin'), start: 'top 95%', toggleActions: play },
+            }
+          );
+
+          // Closing Apply button: pops up with an elastic bounce, then keeps a slow "come on in" wobble + shine sweep
+          const endBtn = one('.v25-end-apply');
+          if (endBtn) {
+            // The wobble only starts once the entrance has finished, so the two never fight over rotation.
+            const wobble = gsap
+              .timeline({ paused: true, repeat: -1, repeatDelay: 2.2 })
+              .to(endBtn, { rotation: -3, duration: 0.09, ease: 'power1.inOut' })
+              .to(endBtn, { rotation: 3, duration: 0.18, ease: 'power1.inOut' })
+              .to(endBtn, { rotation: -2, duration: 0.15, ease: 'power1.inOut' })
+              .to(endBtn, { rotation: 0, duration: 0.5, ease: 'elastic.out(1, 0.35)' });
+            gsap.from(endBtn, {
+              scrollTrigger: { trigger: endBtn, start: 'top 96%', toggleActions: play },
+              y: 60,
+              scale: 0.6,
+              rotation: -6,
+              opacity: 0,
+              duration: 1,
+              ease: 'elastic.out(1, 0.55)',
+              clearProps: 'transform,opacity',
+              onComplete: () => {
+                wobble.delay(1.5).restart();
+              },
+              onReverseComplete: () => {
+                wobble.pause(0);
+              },
+            });
+            disposers.push(() => {
+              wobble.kill();
+              gsap.set(endBtn, { clearProps: 'transform' });
+            });
+          }
+
+          // Expect items: the arrows "stamp" in with a little overshoot, one after another
+          gsap.from(q('.v25-expect-bullet'), {
+            scrollTrigger: { trigger: one('.v25-expect-list'), start: 'top 86%', toggleActions: play },
+            scale: 0,
+            rotation: -90,
+            duration: 0.6,
+            delay: 0.25,
+            stagger: 0.14,
+            ease: 'back.out(3)',
+          });
+
+          // Fine pointers only: wiggle the persona icons and the story-world chips on hover
+          if (conditions.fine) {
+            q('.v25-persona').forEach((card) => {
+              const art = card.querySelector('.v25-persona-art');
+              if (!art) return;
+              const wiggle = gsap
+                .timeline({ paused: true })
+                .to(art, { rotation: -14, scale: 1.18, duration: 0.15, ease: 'power2.out' })
+                .to(art, { rotation: 12, duration: 0.15, ease: 'power2.inOut' })
+                .to(art, { rotation: 0, scale: 1, duration: 0.6, ease: 'elastic.out(1, 0.4)' });
+              const over = () => {
+                wiggle.restart();
+                gsap.to(card, { y: -5, duration: 0.3, ease: 'power2.out', overwrite: 'auto' });
+              };
+              const out = () => gsap.to(card, { y: 0, duration: 0.4, ease: 'power3.out', overwrite: 'auto' });
+              card.addEventListener('pointerenter', over);
+              card.addEventListener('pointerleave', out);
+              disposers.push(() => {
+                card.removeEventListener('pointerenter', over);
+                card.removeEventListener('pointerleave', out);
+                wiggle.kill();
+                gsap.set([card, art], { clearProps: 'transform' });
+              });
+            });
+
+            q('.v25-chip-slot').forEach((slot) => {
+              const over = () =>
+                gsap.to(slot, { rotation: gsap.utils.random([-7, 7]), scale: 1.1, duration: 0.35, ease: 'back.out(3)', overwrite: 'auto' });
+              const out = () =>
+                gsap.to(slot, { rotation: 0, scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.5)', overwrite: 'auto' });
+              slot.addEventListener('pointerenter', over);
+              slot.addEventListener('pointerleave', out);
+              disposers.push(() => {
+                slot.removeEventListener('pointerenter', over);
+                slot.removeEventListener('pointerleave', out);
+                gsap.set(slot, { clearProps: 'transform' });
+              });
+            });
+          }
+
+          return () => {
+            disposers.forEach((dispose) => dispose());
+          };
+        }
+      );
+
+      return () => mm.revert();
+    },
+    { scope: containerRef }
+  );
+
+  // 13. Playful extras (full-motion visitors only; fine-pointer bits only run with a mouse/trackpad):
+  //     - title letters squish and spring back when the pointer runs across them
+  //     - a short sparkle trail follows the pointer around the hero
+  //     - the "ONLY 25 SEATS" badge floats, the background glows drift
+  //     - the genre pill and its words pop in on scroll
+  useGSAP(
+    () => {
+      const root = containerRef.current;
+      if (!root) return;
+      const mm = gsap.matchMedia();
+
+      mm.add(
+        {
+          motion: '(prefers-reduced-motion: no-preference)',
+          fine: '(hover: hover) and (pointer: fine)',
+        },
+        (ctx) => {
+          const conditions = (ctx.conditions ?? {}) as Record<string, boolean | undefined>;
+          if (!conditions.motion) return;
+          const disposers: Array<() => void> = [];
+
+          // Floating badge + drifting glows
+          const badge = root.querySelector<HTMLElement>('.visl25-badge-box');
+          if (badge) gsap.to(badge, { y: -5, duration: 1.8, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+          const glow2 = root.querySelector<HTMLElement>('.visl25-light-glow-2');
+          const glow3 = root.querySelector<HTMLElement>('.visl25-light-glow-3');
+          if (glow2) gsap.to(glow2, { x: -70, y: 50, duration: 9, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+          if (glow3) gsap.to(glow3, { x: 80, y: -40, duration: 11, ease: 'sine.inOut', yoyo: true, repeat: -1 });
+
+          // Genre pill: the pill and each word bounce in
+          const tag = root.querySelector<HTMLElement>('.visl25-footer-tag');
+          if (tag) {
+            gsap.from(Array.from(tag.children), {
+              scrollTrigger: { trigger: tag, start: 'top 92%', toggleActions: 'play none none reverse' },
+              y: 30,
+              scale: 0.7,
+              rotation: () => gsap.utils.random(-6, 6),
+              opacity: 0,
+              duration: 0.8,
+              stagger: 0.12,
+              ease: 'back.out(2)',
+              clearProps: 'transform,opacity',
+            });
+          }
+
+          if (conditions.fine) {
+            // Title letters: squish up, spring back. Letters inside the gradient word are skipped because
+            // background-clip:text does not follow transformed children reliably.
+            const title = root.querySelector<HTMLElement>('.visl25-main-title');
+            if (title) {
+              const onOver = (e: PointerEvent) => {
+                const t = (e.target as HTMLElement).closest<HTMLElement>('.v25-title-char');
+                if (!t || t.closest('.v25-gradient-shimmer') || gsap.isTweening(t)) return;
+                gsap
+                  .timeline()
+                  .to(t, { y: -14, scaleX: 0.85, scaleY: 1.25, rotation: gsap.utils.random(-12, 12), duration: 0.14, ease: 'power2.out' })
+                  .to(t, { y: 0, scaleX: 1, scaleY: 1, rotation: 0, duration: 0.8, ease: 'elastic.out(1, 0.35)' });
+              };
+              title.addEventListener('pointerover', onOver);
+              disposers.push(() => {
+                title.removeEventListener('pointerover', onOver);
+                gsap.set(root.querySelectorAll('.v25-title-char'), { clearProps: 'transform' });
+              });
+            }
+
+            // Sparkle trail (pooled stars, reused). Skipped over the scratch foil so it never competes with the flakes.
+            const header = root.querySelector<HTMLElement>('.visl25-header');
+            const stars = header ? gsap.utils.toArray<HTMLElement>('.v25-trail-star', header) : [];
+            if (header && stars.length) {
+              let idx = 0;
+              let lx = 0;
+              let ly = 0;
+              let acc = 0;
+              const onEnter = (e: PointerEvent) => {
+                const r = header.getBoundingClientRect();
+                lx = e.clientX - r.left;
+                ly = e.clientY - r.top;
+                acc = 0;
+              };
+              const onMove = (e: PointerEvent) => {
+                if ((e.target as Element).closest('.v25-scratch-zone')) return;
+                const r = header.getBoundingClientRect();
+                const x = e.clientX - r.left;
+                const y = e.clientY - r.top;
+                acc += Math.hypot(x - lx, y - ly);
+                lx = x;
+                ly = y;
+                if (acc < 46) return;
+                acc = 0;
+                const star = stars[idx % stars.length];
+                idx += 1;
+                gsap.fromTo(
+                  star,
+                  { x: x - 6, y: y - 6, scale: gsap.utils.random(0.7, 1.3), rotation: gsap.utils.random(0, 90), opacity: 1 },
+                  {
+                    x: x - 6 + gsap.utils.random(-18, 18),
+                    y: y - 6 + gsap.utils.random(14, 40),
+                    rotation: '+=160',
+                    scale: 0,
+                    opacity: 0,
+                    duration: 0.9,
+                    ease: 'power2.out',
+                    overwrite: true,
+                  }
+                );
+              };
+              header.addEventListener('pointerenter', onEnter);
+              header.addEventListener('pointermove', onMove);
+              disposers.push(() => {
+                header.removeEventListener('pointerenter', onEnter);
+                header.removeEventListener('pointermove', onMove);
+                gsap.killTweensOf(stars);
+                gsap.set(stars, { opacity: 0 });
+              });
+            }
+          }
+
+          return () => disposers.forEach((dispose) => dispose());
+        }
+      );
+
+      return () => mm.revert();
+    },
+    { scope: containerRef }
+  );
+
   return (
     <div className="visl25-page" ref={containerRef}>
       {/* ─────────────────────────────────────────────────────────────
@@ -1990,6 +2479,12 @@ export function Visl25Page() {
             HEADER SECTION (STRICTLY FROM POSTERS ONLY)
             ========================================================= */}
         <header className="visl25-header" aria-label="Header">
+          {/* Pooled sparkle-trail stars (moved by GSAP, hidden by default) */}
+          <div className="v25-trail-layer" aria-hidden="true">
+            {Array.from({ length: TRAIL_COUNT }, (_, i) => (
+              <span className={`v25-trail-star v25-trail-c${i % 4}`} key={i} />
+            ))}
+          </div>
           {/* Badge: "ONLY 25 SEATS" */}
           <div className="visl25-badge-box">
             <div className="visl25-badge">
@@ -2024,18 +2519,90 @@ export function Visl25Page() {
             25 founding seats for storytellers &amp; AI creators building long-form stories.
           </p>
 
-          {/* Primary Apply CTA */}
-          <div className="visl25-hero-btn-wrap">
-            <a
-              href={FORM_URL}
-              className="visl25-apply-btn"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Apply now for Visl 25"
-            >
-              <span>Apply Now</span>
-              <span className="visl25-btn-arrow">→</span>
-            </a>
+          {/* Golden ticket: scratch ~10% of the gold foil to reveal the offer and the Apply button */}
+          <div className="visl25-hero-ticket">
+            <div className="v25-ticket-wrap" ref={ticketRef} data-revealed={revealed ? 'true' : 'false'}>
+              <div className="v25-ticket-main">
+                <div className="v25-ticket-topbar" aria-hidden="true">
+                  <span>★ Golden Ticket</span>
+                  <span>Admit One</span>
+                  <span>No. 025</span>
+                </div>
+
+                <div className="v25-scratch-zone" ref={zoneRef}>
+                  <h3 className="visl25-cta-headline v25-letter-headline" aria-label="Apply for a Founding Creator Seat">
+                    {['Apply', 'for', 'a', 'Founding', 'Creator', 'Seat'].map((word, wordIndex) => (
+                      <span className={`v25-letter-word${wordIndex > 1 ? ' v25-gradient-shimmer' : ''}`} aria-hidden="true" key={word}>
+                        {word.split('').map((letter, index) => (
+                          <span className={`v25-letter v25-letter-${(index + wordIndex) % 6}${wordIndex > 1 ? ' v25-letter-gradient-glyph' : ''}`} key={`${word}-${index}`}>{letter}</span>
+                        ))}
+                        {' '}
+                      </span>
+                    ))}
+                  </h3>
+
+                  {/* These elements live UNDER the scratch foil, so the surprise stays hidden until scratched. */}
+                  <p className="visl25-cta-sub v25-scratch-copy">
+                    Make your first films on us. Open to ambitious storytellers and AI creators building long-form stories.
+                  </p>
+
+                  <div className="v25-apply-wrap v25-scratch-apply">
+                    <div className="v25-apply-pulse">
+                      <a
+                        href={FORM_URL}
+                        className="visl25-apply-btn v25-apply-golden"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Apply to be considered for Visl 25"
+                      >
+                        <span>Apply Now</span>
+                        <span className="visl25-btn-arrow">→</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Golden flash that pops when the foil comes off */}
+                  <div className="v25-reveal-flash" aria-hidden="true" />
+
+                  {/* The gold foil. Painted and scratched on a canvas by the effect above. */}
+                  <canvas ref={canvasRef} className="v25-scratch-canvas" aria-hidden="true" />
+                  <div className="v25-foil-shimmer" aria-hidden="true" />
+
+                  {/* Gold flakes that fly off while scratching (pooled, reused) */}
+                  <div className="v25-flake-layer" aria-hidden="true">
+                    {Array.from({ length: FLAKE_COUNT }, (_, i) => (
+                      <span className="v25-flake" key={i} />
+                    ))}
+                  </div>
+
+                  {/* A coin that scribbles on the foil until the first touch, as a hint */}
+                  <div className="v25-scratch-hint" aria-hidden="true">
+                    <svg viewBox="0 0 40 40" fill="none">
+                      <circle cx="20" cy="20" r="17" fill="#fbbf24" stroke="#b45309" strokeWidth="2.5" />
+                      <circle cx="20" cy="20" r="11" stroke="#b45309" strokeWidth="1.8" strokeOpacity="0.7" />
+                      <path d="M20 12l2.6 5.2 5.7.8-4.1 4 1 5.7-5.2-2.7-5.1 2.7 1-5.7-4.2-4 5.8-.8z" fill="#b45309" fillOpacity="0.85" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="v25-ticket-note">
+                  {revealed ? (
+                    <p className="v25-unlocked-note" role="status">Applications are reviewed on a rolling basis. Applying does not guarantee selection.</p>
+                  ) : (
+                    <button type="button" className="v25-reveal-skip" onClick={() => revealFnRef.current?.()}>
+                      Scratch the gold, or tap here to reveal
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Confetti burst layer (pooled, hidden until the reveal) */}
+              <div className="v25-confetti-layer" aria-hidden="true">
+                {Array.from({ length: CONFETTI_COUNT }, (_, i) => (
+                  <span className={`v25-confetti v25-confetti-c${i % 5} v25-confetti-s${i % 3}`} key={i} />
+                ))}
+              </div>
+            </div>
           </div>
         </header>
 
@@ -2093,114 +2660,119 @@ export function Visl25Page() {
           </div>
 
           {/* Footer tag strictly from posters */}
-          <div className="visl25-footer-tag-wrap">
+          {/* <div className="visl25-footer-tag-wrap">
             <div className="visl25-footer-tag">
               <span className="genres">KIDS · MYTHOLOGY · HISTORY · MICRODRAMAS</span>
               <span className="divider">—</span>
               <span>Storytellers &amp; AI creators welcome</span>
             </div>
-          </div>
+          </div> */}
         </section>
 
+        {/* Blank "film break" band #2: the film strip swings back to the left lane here */}
         <div className="v25-film-gap" data-film-gap="2" aria-hidden="true" />
 
         {/* =========================================================
-            GOLDEN TICKET CTA
-            Scratch the gold foil to reveal "Apply for a Founding Creator Seat" (the letter animation plays
-            on reveal), then the Apply Now button wakes up with rings, sparkles and a periodic wiggle.
+            WHO SHOULD APPLY / WHAT WE EXPECT
+            (all copy taken from the program one-pager)
             ========================================================= */}
-        <section className="visl25-cta-section" aria-label="Apply Now Box">
-          <div className="v25-ticket-wrap" ref={ticketRef} data-revealed={revealed ? 'true' : 'false'}>
-            {/* Upper half of the ticket: header strip + scratch panel */}
-            <div className="v25-ticket-main">
-              <span className="v25-tk-star v25-tk-star-a" aria-hidden="true" />
-              <span className="v25-tk-star v25-tk-star-b" aria-hidden="true" />
+        <section className="v25-apply-section" ref={applyRef} aria-label="Who should apply">
+          {/* 1. WHO SHOULD APPLY */}
+          <div className="v25-who">
+            <div className="v25-apply-head">
+              <h2 className="v25-apply-heading">
+                Who should <span className="v25-gradient-shimmer">apply</span>
+              </h2>
+              <svg className="v25-squiggle" viewBox="0 0 220 14" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M2 8C20 0 36 14 54 7S90 1 108 8s36 6 54-1 36-5 56 1" />
+              </svg>
+            </div>
 
-              <div className="v25-ticket-topbar" aria-hidden="true">
-                <span>★ Golden Ticket</span>
-                <span className="v25-ticket-topbar-mid">Admit One</span>
-                <span>No. 025</span>
-              </div>
-
-              <div className="v25-scratch-zone" ref={zoneRef}>
-                <h3 className="visl25-cta-headline v25-letter-headline" aria-label="Apply for a Founding Creator Seat">
-                  {['Apply', 'for', 'a', 'Founding', 'Creator', 'Seat'].map((word, wordIndex) => (
-                    <span className={`v25-letter-word${wordIndex > 1 ? ' v25-gradient-shimmer' : ''}`} aria-hidden="true" key={word}>
-                      {word.split('').map((letter, index) => (
-                        <span className={`v25-letter v25-letter-${(index + wordIndex) % 6}${wordIndex > 1 ? ' v25-letter-gradient-glyph' : ''}`} key={`${word}-${index}`}>{letter}</span>
-                      ))}
-                      {' '}
-                    </span>
-                  ))}
-                </h3>
-
-                {/* These elements live UNDER the scratch foil, so the surprise stays hidden until scratched. */}
-                <p className="visl25-cta-sub v25-scratch-copy">
-                  Make your first films on us. Applications are open to ambitious storytellers and AI creators building
-                  long-form stories.
-                </p>
-
-                <div className="v25-apply-wrap v25-scratch-apply">
-                  <div className="v25-apply-pulse">
-                    <span className="v25-btn-ring v25-btn-ring-a" aria-hidden="true" />
-                    <span className="v25-btn-ring v25-btn-ring-b" aria-hidden="true" />
-                    <span className="v25-btn-spark v25-btn-spark-a" aria-hidden="true" />
-                    <span className="v25-btn-spark v25-btn-spark-b" aria-hidden="true" />
-                    <span className="v25-btn-spark v25-btn-spark-c" aria-hidden="true" />
-                    <span className="v25-btn-spark v25-btn-spark-d" aria-hidden="true" />
-                    <a
-                      href={FORM_URL}
-                      className="visl25-apply-btn v25-apply-golden"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Apply to be considered for Visl 25"
-                    >
-                      <span>Apply Now</span>
-                    </a>
+            <div className="v25-persona-grid">
+              {PERSONAS.map((p) => (
+                <article className="v25-persona" key={p.id}>
+                  <div className="v25-persona-art" aria-hidden="true">
+                    <PersonaArt kind={p.art} />
                   </div>
-                </div>
-                <div className="v25-barcode v25-scratch-barcode" aria-hidden="true" />
+                  <p className="v25-eyebrow">{p.label}</p>
+                  <p className="v25-persona-text">{p.text}</p>
+                </article>
+              ))}
+            </div>
 
-                {/* Golden flash that pops when the foil comes off */}
-                <div className="v25-reveal-flash" aria-hidden="true" />
+            <div className="v25-worlds">
+              <p className="v25-worlds-label">Story worlds we&apos;re looking for</p>
+              <ul className="v25-chip-list">
+                {STORY_WORLDS.map((w) => (
+                  
+<li className="v25-chip-slot" key={w.label}>
+  <span className="v25-chip">
+    <WorldIcon kind={w.icon} />
+    {w.label}
+  </span>
+</li>
 
-                {/* The gold foil. Painted and scratched on a canvas by the effect above. */}
-                <canvas ref={canvasRef} className="v25-scratch-canvas" aria-hidden="true" />
-                <div className="v25-foil-shimmer" aria-hidden="true" />
+                ))}
+              </ul>
+            </div>
+          </div>
 
-                {/* Gold flakes that fly off while scratching (pooled, reused) */}
-                <div className="v25-flake-layer" aria-hidden="true">
-                  {Array.from({ length: FLAKE_COUNT }, (_, i) => (
-                    <span className="v25-flake" key={i} />
-                  ))}
-                </div>
+          {/* 2. WHAT WE EXPECT */}
+          <div className="v25-expect-col">
+            <div className="v25-expect-head">
+              <h3 className="v25-sub-heading">What we expect</h3>
+              <svg className="v25-squiggle v25-squiggle-sm" viewBox="0 0 220 14" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M2 8C20 0 36 14 54 7S90 1 108 8s36 6 54-1 36-5 56 1" />
+              </svg>
+            </div>
 
-                {/* A coin that scribbles on the foil until the first touch, as a hint */}
-                <div className="v25-scratch-hint" aria-hidden="true">
-                  <svg viewBox="0 0 40 40" fill="none">
-                    <circle cx="20" cy="20" r="17" fill="#fbbf24" stroke="#b45309" strokeWidth="2.5" />
-                    <circle cx="20" cy="20" r="11" stroke="#b45309" strokeWidth="1.8" strokeOpacity="0.7" />
-                    <path d="M20 12l2.6 5.2 5.7.8-4.1 4 1 5.7-5.2-2.7-5.1 2.7 1-5.7-4.2-4 5.8-.8z" fill="#b45309" fillOpacity="0.85" />
+            <div className="v25-expect-grid">
+              <ul className="v25-expect-list">
+                <li className="v25-expect-item">
+                  <span className="v25-expect-bullet" aria-hidden="true" />
+                  <span>
+                    Create <strong className="v25-mark">at least 3 videos</strong> with Visl during the program.
+                  </span>
+                </li>
+                <li className="v25-expect-item">
+                  <span className="v25-expect-bullet" aria-hidden="true" />
+                  <span>Publish these videos on your own channel.</span>
+                </li>
+                <li className="v25-expect-item">
+                  <span className="v25-expect-bullet" aria-hidden="true" />
+                  <span>
+                    Credit <strong className="v25-mark">&ldquo;Made with Visl&rdquo;</strong> and tag Visl in the caption.
+                  </span>
+                </li>
+                <li className="v25-expect-item">
+                  <span className="v25-expect-bullet" aria-hidden="true" />
+                  <span>Share honest feedback — what worked, what broke.</span>
+                </li>
+              </ul>
+
+              <div className="v25-winwin">
+                <span className="v25-winwin-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path className="v25-winwin-trend" d="M3 17l6-6 4 4 8-8" />
+                    <path d="M15 7h6v6" />
                   </svg>
-                </div>
-              </div>
-
-              <div className="v25-ticket-note">
-                {revealed ? (
-                  <p className="v25-unlocked-note" role="status">Applications are reviewed. Applying does not guarantee selection.</p>
-                ) : (
-                  <button type="button" className="v25-reveal-skip" onClick={() => revealFnRef.current?.()}>
-                    Scratch the gold, or tap here to reveal
-                  </button>
-                )}
+                  WIN-WIN
+                </span>
+                <p>Every video you make grows your channel and shows what Visl can do — a win for both of us.</p>
               </div>
             </div>
 
-            {/* Confetti burst layer (pooled, hidden until the reveal) */}
-            <div className="v25-confetti-layer" aria-hidden="true">
-              {Array.from({ length: CONFETTI_COUNT }, (_, i) => (
-                <span className={`v25-confetti v25-confetti-c${i % 5} v25-confetti-s${i % 3}`} key={i} />
-              ))}
+            <div className="v25-end-cta">
+              <a
+                href={FORM_URL}
+                className="visl25-apply-btn v25-end-apply"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Apply to be considered for Visl 25"
+              >
+                <span>Apply Now</span>
+                <span className="visl25-btn-arrow">→</span>
+              </a>
             </div>
           </div>
         </section>
